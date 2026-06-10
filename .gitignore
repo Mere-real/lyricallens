@@ -1,0 +1,8 @@
+# Ignore configuration files with sensitive data
+config.php
+
+# Ignore the uploaded files so you don't push heavy media
+uploads/
+
+# Ignore Mac system files
+.DS_Store
