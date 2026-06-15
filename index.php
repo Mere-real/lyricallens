@@ -73,12 +73,21 @@ $result = $stmt->get_result();
         .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; }
         .card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .tag { background: #3498db; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; margin-right: 5px; display: inline-block;}
+        
+        /* New styling for the upload button */
+        .btn-upload { display: inline-block; background-color: #2ecc71; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; margin-bottom: 20px; transition: background-color 0.3s ease; }
+        .btn-upload:hover { background-color: #27ae60; }
+        .header-actions { text-align: center; margin-bottom: 25px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 style="text-align: center; color: #2c3e50;">LyricalLens Database Engine</h1>
+    <h1 style="text-align: center; color: #2c3e50; margin-bottom: 10px;">LyricalLens Database Engine</h1>
+    
+    <div class="header-actions">
+        <a href="upload.php" class="btn-upload">➕ Upload New Media</a>
+    </div>
     
     <form action="index.php" method="GET">
         <div class="search-section">
