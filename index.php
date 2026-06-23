@@ -86,7 +86,7 @@ $result = $stmt->get_result();
     <h1 style="text-align: center; color: #2c3e50; margin-bottom: 10px;">LyricalLens Database Engine</h1>
     
     <div class="header-actions">
-        <a href="upload.php" class="btn-upload">➕ Upload New Media</a>
+        <a href="lyricallens/upload.php" class="btn-upload">➕ Upload New Media</a>
     </div>
     
     <form action="index.php" method="GET">
