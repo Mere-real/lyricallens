@@ -236,39 +236,4 @@ $result_media = $stmt_media->get_result();
                                 </audio>
                             <?php endif; ?>
                         <?php else: ?>
-                            <div style="padding: 10px; background: #ffeaa7; color: #d35400; border-radius: 4px; font-size: 0.9em;">
-                                ⚠️ Media file not found on server.
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <div style="margin-bottom: 10px;">
-                        <span class="tag"><?php echo htmlspecialchars($row['Format_Type']); ?></span>
-                        <span class="tag"><?php echo htmlspecialchars($row['File_Size_MB']); ?> MB</span>
-                        <span class="tag"><?php echo htmlspecialchars($row['Genre'] ?? 'No Genre'); ?></span>
-                        <span class="tag"><?php echo htmlspecialchars($row['Vocal_Gender'] ?? 'No Vocal Data'); ?></span>
-                    </div>
-
-                    <p style="font-size: 0.85em; color: #555; background: #f9f9f9; padding: 10px; border-radius: 4px; border-left: 3px solid #3498db;">
-                        <strong>Transcript Snippet:</strong><br>
-                        <?php 
-                            $lyrics = $row['Extracted_Lyrics'];
-                            echo !empty($lyrics) ? htmlspecialchars(substr($lyrics, 0, 100)) . '...' : '<em>No transcript available.</em>';
-                        ?>
-                    </p>
-                </div>
-            <?php endwhile; ?>
-        </div>
-    <?php else: ?>
-        <p style="color: #e74c3c;">No media assets match your query parameters.</p>
-    <?php endif; ?>
-
-</div>
-
-</body>
-</html>
-
-<?php 
-$stmt_media->close();
-$conn->close(); 
-?>
+                            <div style="padding: 10px; background: #ffeaa7; color: #d35400; border-radius
