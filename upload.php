@@ -31,6 +31,33 @@
         <button type="submit">Analyze & Upload</button>
     </form>
 </div>
+<div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.95); z-index:9999; flex-direction:column; justify-content:center; align-items:center;">
+    
+    <!-- CSS Spinner -->
+    <div style="border: 8px solid #f3f3f3; border-top: 8px solid #3498db; border-radius: 50%; width: 70px; height: 70px; animation: spin 1.5s linear infinite;"></div>
+    
+    <h2 style="color: #2c3e50; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin-top:25px;">Please wait, this might take some time...</h2>
+    <p style="color: #7f8c8d; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 1.1em;">Extracting metadata and analyzing audio with Gemini AI.</p>
+    
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</div>
 
+<!-- JAVASCRIPT TRIGGER -->
+<script>
+    // Grab the upload form and listen for the submit button
+    document.querySelector('form').addEventListener('submit', function() {
+        // Show the loading screen with flexbox so it centers perfectly
+        document.getElementById('loadingOverlay').style.display = 'flex';
+        
+        // Optional: Disable the submit button so they don't click it twice
+        let submitBtn = this.querySelector('button[type="submit"]');
+        if(submitBtn) {
+            submitBtn.style.opacity = '0.5';
+            submitBtn.innerText = 'Uploading...';
+        }
+    });
+</script>
 </body>
 </html>

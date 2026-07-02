@@ -1,44 +1,42 @@
 <?php
-// extract_and_save.php
-
+// analyze_mmdb.php
 session_start();
-require 'config.php'; 
+require 'config.php';
 require_once('getid3-master/getid3/getid3.php');
 
-// Prevent PHP from timing out while waiting for Gemini to process large files
 set_time_limit(0); 
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
+if (!isset($_SESSION['user_id'])) {
+    die("<h3 style='color:red;'>Access Denied: You must be logged in.</h3>");
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
     
-    $userId = 1; 
-    $stmt1 = null; $stmt2 = null; $stmt3 = null; $uploadDest = null;
+    $userId = $_SESSION['user_id']; 
+    $uploadDest = $_POST['file_path']; // The existing path (e.g. uploads/1779151815_AUDIO...)
+    $title = $_POST['title'];
 
-    // --- 1. PHYSICAL FILE HANDLING ---
-    $file = $_FILES['media_file'];
-    if ($file['error'] !== 0) die("<h3 style='color:red;'>Upload Error Code: " . $file['error'] . "</h3>");
+    // 1. Verify file actually exists on the server
+    if (!file_exists($uploadDest)) {
+        die("<h3 style='color:red;'>Error: The requested file could not be found on the server at path: " . htmlspecialchars($uploadDest) . "</h3>");
+    }
 
-    $fileSizeMB = round($file['size'] / 1048576, 2); 
-    $formatType = '.' . strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)); 
+    // 2. Local Extraction
+    $fileSizeMB = round(filesize($uploadDest) / 1048576, 2); 
+    $formatType = '.' . strtolower(pathinfo($uploadDest, PATHINFO_EXTENSION)); 
+    $mimeType = mime_content_type($uploadDest);
 
-    $uploadDir = 'uploads/';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true); 
-
-    $uploadDest = $uploadDir . uniqid('media_', true) . $formatType;
-    if (!move_uploaded_file($file['tmp_name'], $uploadDest)) die("Failed to move file.");
-
-    // --- 2. LOCAL EXTRACTION (Duration via getID3) ---
     $getID3 = new getID3;
     $fileInfo = $getID3->analyze($uploadDest);
     $duration = $fileInfo['playtime_string'] ?? '0:00';
-    $mimeType = mime_content_type($uploadDest);
 
-    // --- 3. AI EXTRACTION STEP 1: UPLOAD TO GEMINI ---
+    // 3. AI EXTRACTION STEP 1: UPLOAD TO GEMINI
     $ch1 = curl_init("https://generativelanguage.googleapis.com/upload/v1beta/files?key=" . GEMINI_API_KEY);
     
     curl_setopt_array($ch1, [
         CURLOPT_POST => true,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 300, // Give it up to 5 minutes to upload
+        CURLOPT_TIMEOUT => 300,
         CURLOPT_POSTFIELDS => file_get_contents($uploadDest),
         CURLOPT_HTTPHEADER => [
             "X-Goog-Upload-Protocol: raw",
@@ -51,19 +49,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
     curl_close($ch1);
 
     $uploadData = json_decode($uploadResponse, true);
-    
     if (isset($uploadData['error'])) {
         die("<h3 style='color:red;'>Gemini Upload Error: " . htmlspecialchars($uploadData['error']['message']) . "</h3>");
     }
 
     $fileUri = $uploadData['file']['uri'] ?? null;
-    $fileName = $uploadData['file']['name'] ?? null; // e.g., "files/ekuilfge20cj"
+    $fileName = $uploadData['file']['name'] ?? null;
     if (!$fileUri || !$fileName) die("<h3 style='color:red;'>Failed to retrieve File details from Gemini.</h3>");
 
-    // --- 4. AI EXTRACTION STEP 2: POLL FOR "ACTIVE" STATE ---
-    // Instead of a blind 3-second sleep, we ask Google if the file is ready
+    // 4. AI EXTRACTION STEP 2: POLL FOR "ACTIVE" STATE
     $isActive = false;
-    $maxAttempts = 15; // Max 75 seconds wait (15 * 5 seconds)
+    $maxAttempts = 15; 
     $attempts = 0;
 
     while (!$isActive && $attempts < $maxAttempts) {
@@ -80,7 +76,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
         } elseif ($state === 'FAILED') {
             die("<h3 style='color:red;'>Gemini Processing Error: Google failed to process the media file.</h3>");
         } else {
-            // State is still "PROCESSING", wait 5 seconds and check again
             sleep(5);
             $attempts++;
         }
@@ -90,8 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
         die("<h3 style='color:red;'>Timeout Error: File took too long to process on Google's servers.</h3>");
     }
 
-    // --- 5. AI EXTRACTION STEP 3: ANALYZE THE UPLOADED FILE ---
-    $promptText = "Analyze this media file. Return a JSON object with exactly three keys: 'lyrics' (the transcribed text), 'genre' (the musical theme, e.g., 'Melancholy/Indie', 'Pop', 'Electronic'), and 'vocal_gender' ('Male', 'Female', or 'Instrumental').";
+    // 5. AI EXTRACTION STEP 3: ANALYZE THE UPLOADED FILE
+    $promptText = "Analyze this media file. Return a JSON object with exactly three keys: 'lyrics' (the transcribed text or speech), 'genre' (the musical/spoken theme), and 'vocal_gender' ('Male', 'Female', or 'Instrumental').";
 
     $payload = json_encode([
         "contents" => [[
@@ -120,7 +115,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
     curl_close($ch2);
 
     $responseData = json_decode($response, true);
-    
     if (isset($responseData['error'])) {
         die("<h3 style='color:red;'>Gemini Analysis Error: " . htmlspecialchars($responseData['error']['message']) . "</h3>");
     }
@@ -131,10 +125,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
     $lyrics = $aiExtracted['lyrics'] ?? 'Extraction failed or no vocals detected.';
     $genre = $aiExtracted['genre'] ?? 'Unknown';
     $vocalGender = $aiExtracted['vocal_gender'] ?? 'Unknown';
-    $title = $_POST['title']; 
 
-    // --- 6. ACID DATABASE TRANSACTION ---
+    // 6. ACID DATABASE TRANSACTION
     $conn->begin_transaction();
+    $stmt1 = null; $stmt2 = null; $stmt3 = null;
 
     try {
         $stmt1 = $conn->prepare("INSERT INTO MEDIA_ASSETS (User_ID, Title, File_Path, Format_Type, File_Size_MB) VALUES (?, ?, ?, ?, ?)");
@@ -153,9 +147,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
 
         $conn->commit();
 
-        // --- SUCCESS UI ---
-        echo "<div style='max-width: 650px; margin: 40px auto; padding: 25px; font-family: sans-serif; background: white; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #1b73e8;'>";
-        echo "<h2 style='color: #1b73e8; margin-top: 0; text-align: center;'>✨ File API Extraction Complete</h2>";
+        // SUCCESS UI
+        echo "<div style='max-width: 650px; margin: 40px auto; padding: 25px; font-family: sans-serif; background: white; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #9b59b6;'>";
+        echo "<h2 style='color: #9b59b6; margin-top: 0; text-align: center;'>✨ MMDB Extraction Complete</h2>";
         
         echo "<div style='background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #e9ecef;'>";
         echo "<h3 style='margin-top: 0; color: #2c3e50; border-bottom: 2px solid #bdc3c7; padding-bottom: 5px;'>System Metadata</h3>";
@@ -168,14 +162,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['media_file'])) {
         echo "<strong>Transcribed Lyrics:</strong><blockquote style='background: #fff; padding: 10px; border-left: 4px solid #8e44ad;'>$lyrics</blockquote>";
         echo "</div>";
 
-        echo "<div style='display: flex; gap: 10px;'>";
-        echo "<a href='upload.php' style='flex: 1; text-align: center; background: #95a5a6; color: white; padding: 12px; text-decoration: none; border-radius: 4px;'>Upload Another</a>";
-        echo "<a href='index.php' style='flex: 1; text-align: center; background: #3498db; color: white; padding: 12px; text-decoration: none; border-radius: 4px;'>Search Database →</a>";
+        echo "<div style='text-align: center;'>";
+        echo "<a href='dashboard.php' style='display: inline-block; background: #3498db; color: white; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold;'>Return to Dashboard</a>";
         echo "</div></div>";
 
     } catch (Exception $e) {
         $conn->rollback();
-        if ($uploadDest && file_exists($uploadDest)) unlink($uploadDest);
         echo "<h2 style='color: red; text-align: center;'>⚠️ Transaction Failed: " . $e->getMessage() . "</h2>";
     }
 
