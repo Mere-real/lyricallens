@@ -16,40 +16,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
     $relativePath = $_POST['file_path']; // e.g., "uploads/1779151815_AUDIO..."
     $title = $_POST['title'];
 
-    // 1. Construct the full remote URL
-    // This prefixes the relative path with the correct UTEM server address
+    // 1. Construct the remote URL and the local destination
     $remoteUrl = "https://bitp3353.utem.edu.my/2026/all/" . $relativePath;
+    $localDest = $relativePath; // Keeps the exact "uploads/..." structure
 
-    // 2. Download the remote file to a temporary location for processing
-    $tempFile = sys_get_temp_dir() . '/' . uniqid('mmdb_') . '_' . basename($relativePath);
-    
+    // Ensure the local uploads directory exists
+    $uploadDir = 'uploads/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0777, true);
+    }
+
+    // 2. Download the remote file permanently to the local server
     $ch_dl = curl_init($remoteUrl);
-    $fp = fopen($tempFile, 'wb');
+    $fp = fopen($localDest, 'wb');
     curl_setopt($ch_dl, CURLOPT_FILE, $fp);
     curl_setopt($ch_dl, CURLOPT_HEADER, 0);
     curl_setopt($ch_dl, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch_dl, CURLOPT_SSL_VERIFYPEER, false); // Ignore strict SSL warnings
+    curl_setopt($ch_dl, CURLOPT_SSL_VERIFYPEER, false); 
     curl_exec($ch_dl);
     $httpCode = curl_getinfo($ch_dl, CURLINFO_HTTP_CODE);
     curl_close($ch_dl);
     fclose($fp);
 
-    // Verify the download was successful
-    if ($httpCode != 200 || !file_exists($tempFile) || filesize($tempFile) == 0) {
-        if(file_exists($tempFile)) unlink($tempFile);
+    if ($httpCode != 200 || !file_exists($localDest) || filesize($localDest) == 0) {
+        if(file_exists($localDest)) unlink($localDest);
         die("<h3 style='color:red;'>Error: Could not retrieve the remote file from: " . htmlspecialchars($remoteUrl) . "</h3>");
     }
 
-    // 3. Local Extraction using the Temporary File
-    $fileSizeMB = round(filesize($tempFile) / 1048576, 2); 
-    $formatType = '.' . strtolower(pathinfo($relativePath, PATHINFO_EXTENSION)); 
+    // 3. Local Extraction using the newly downloaded file
+    $fileSizeMB = round(filesize($localDest) / 1048576, 2); 
+    $formatType = '.' . strtolower(pathinfo($localDest, PATHINFO_EXTENSION)); 
     
-    // Handle edge case where MIME type might not be detected correctly for remote temp files
-    $detectedMime = mime_content_type($tempFile);
+    $detectedMime = mime_content_type($localDest);
     $mimeType = $detectedMime ? $detectedMime : ($formatType === '.mp4' ? 'video/mp4' : 'audio/mpeg');
 
     $getID3 = new getID3;
-    $fileInfo = $getID3->analyze($tempFile);
+    $fileInfo = $getID3->analyze($localDest);
     $duration = $fileInfo['playtime_string'] ?? '0:00';
 
     // 4. AI EXTRACTION STEP 1: UPLOAD TO GEMINI
@@ -59,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
         CURLOPT_POST => true,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 300,
-        CURLOPT_POSTFIELDS => file_get_contents($tempFile), // Upload from temp file
+        CURLOPT_POSTFIELDS => file_get_contents($localDest), 
         CURLOPT_HTTPHEADER => [
             "X-Goog-Upload-Protocol: raw",
             "Content-Type: " . $mimeType
@@ -72,14 +74,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
 
     $uploadData = json_decode($uploadResponse, true);
     if (isset($uploadData['error'])) {
-        unlink($tempFile); // Clean up
+        unlink($localDest); 
         die("<h3 style='color:red;'>Gemini Upload Error: " . htmlspecialchars($uploadData['error']['message']) . "</h3>");
     }
 
     $fileUri = $uploadData['file']['uri'] ?? null;
     $fileName = $uploadData['file']['name'] ?? null;
     if (!$fileUri || !$fileName) {
-        unlink($tempFile);
+        unlink($localDest);
         die("<h3 style='color:red;'>Failed to retrieve File details from Gemini.</h3>");
     }
 
@@ -100,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
         if ($state === 'ACTIVE') {
             $isActive = true;
         } elseif ($state === 'FAILED') {
-            unlink($tempFile);
+            unlink($localDest);
             die("<h3 style='color:red;'>Gemini Processing Error: Google failed to process the media file.</h3>");
         } else {
             sleep(5);
@@ -109,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
     }
 
     if (!$isActive) {
-        unlink($tempFile);
+        unlink($localDest);
         die("<h3 style='color:red;'>Timeout Error: File took too long to process on Google's servers.</h3>");
     }
 
@@ -140,14 +142,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
     
     $response = curl_exec($ch2);
     if (curl_errno($ch2)) {
-        unlink($tempFile);
+        unlink($localDest);
         die("<h3 style='color:red;'>Analysis API Error: " . curl_error($ch2) . "</h3>");
     }
     curl_close($ch2);
 
     $responseData = json_decode($response, true);
     if (isset($responseData['error'])) {
-        unlink($tempFile);
+        unlink($localDest);
         die("<h3 style='color:red;'>Gemini Analysis Error: " . htmlspecialchars($responseData['error']['message']) . "</h3>");
     }
 
@@ -158,19 +160,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
     $genre = $aiExtracted['genre'] ?? 'Unknown';
     $vocalGender = $aiExtracted['vocal_gender'] ?? 'Unknown';
 
-    // 7. CLEAN UP THE TEMPORARY FILE
-    if (file_exists($tempFile)) {
-        unlink($tempFile);
-    }
-
-    // 8. ACID DATABASE TRANSACTION
+    // 7. ACID DATABASE TRANSACTION
     $conn->begin_transaction();
     $stmt1 = null; $stmt2 = null; $stmt3 = null;
 
     try {
-        // We save $remoteUrl directly to the database so the video player in the dashboard can stream it!
+        // Save the exact "uploads/..." path to the database
         $stmt1 = $conn->prepare("INSERT INTO MEDIA_ASSETS (User_ID, Title, File_Path, Format_Type, File_Size_MB) VALUES (?, ?, ?, ?, ?)");
-        $stmt1->bind_param("isssd", $userId, $title, $remoteUrl, $formatType, $fileSizeMB);
+        $stmt1->bind_param("isssd", $userId, $title, $localDest, $formatType, $fileSizeMB);
         $stmt1->execute();
         $assetId = $conn->insert_id; 
 
@@ -192,7 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
         echo "<div style='background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #e9ecef;'>";
         echo "<h3 style='margin-top: 0; color: #2c3e50; border-bottom: 2px solid #bdc3c7; padding-bottom: 5px;'>System Metadata</h3>";
         echo "<p><strong>Title:</strong> " . htmlspecialchars($title) . " | <strong>Size:</strong> $fileSizeMB MB | <strong>Duration:</strong> $duration</p>";
-        echo "<p><strong>Source URL:</strong> <a href='" . htmlspecialchars($remoteUrl) . "' target='_blank'>Verify Link</a></p>";
+        echo "<p><strong>File Saved To:</strong> <code>" . htmlspecialchars($localDest) . "</code></p>";
         echo "</div>";
 
         echo "<div style='background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px; border: 1px solid #e9ecef;'>";
