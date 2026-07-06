@@ -289,7 +289,7 @@ try {
                                         <form action="analyze_mmdb.php" method="POST" class="analyze-form">
                                             <input type="hidden" name="file_path" value="<?php echo htmlspecialchars($row['audioStu']); ?>">
                                             <input type="hidden" name="title" value="Audio: <?php echo htmlspecialchars($row['matric_no']); ?> - <?php echo htmlspecialchars($row['full_name']); ?>">
-                                            <button type="submit" class="btn-ai">✨ Analyze via AI</button>
+                                            <button type="submit" class="btn-ai">✨ Analyze</button>
                                         </form>
                                     <?php else: ?>
                                         <span style="color: #ccc;">No File</span>
@@ -303,7 +303,7 @@ try {
                                         <form action="analyze_mmdb.php" method="POST" class="analyze-form">
                                             <input type="hidden" name="file_path" value="<?php echo htmlspecialchars($row['videoStu']); ?>">
                                             <input type="hidden" name="title" value="Video: <?php echo htmlspecialchars($row['matric_no']); ?> - <?php echo htmlspecialchars($row['full_name']); ?>">
-                                            <button type="submit" class="btn-ai">✨ Analyze via AI</button>
+                                            <button type="submit" class="btn-ai">✨ Analyze</button>
                                         </form>
                                     <?php else: ?>
                                         <span style="color: #ccc;">No File</span>
