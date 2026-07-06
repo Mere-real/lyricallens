@@ -155,7 +155,7 @@ try {
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 1: SEARCH PORTAL CONTENT (RESTORED)    -->
+    <!-- TAB 1: SEARCH PORTAL CONTENT               -->
     <!-- ========================================== -->
     <div id="tab-search" class="tab-content active">
         <form action="dashboard.php" method="GET">
@@ -263,6 +263,10 @@ try {
                         </tr>
                     </thead>
                     <tbody>
+                        <?php 
+                        // Base URL for the UTEM server
+                        $utemBaseUrl = "https://bitp3353.utem.edu.my/2026/all/"; 
+                        ?>
                         <?php foreach ($vstu_data as $row): ?>
                             <tr>
                                 <td>
@@ -275,21 +279,21 @@ try {
                                 </td>
                                 <td>
                                     <?php if(!empty($row['photoStu'])): ?>
-                                        <a href="<?php echo htmlspecialchars($row['photoStu']); ?>" target="_blank" class="view-link">📷 View Photo</a>
+                                        <a href="<?php echo htmlspecialchars($utemBaseUrl . $row['photoStu']); ?>" target="_blank" class="view-link">📷 View Photo</a>
                                     <?php endif; ?>
                                     <?php if(!empty($row['docStu'])): ?>
-                                        <a href="<?php echo htmlspecialchars($row['docStu']); ?>" target="_blank" class="view-link">📄 View Doc</a>
+                                        <a href="<?php echo htmlspecialchars($utemBaseUrl . $row['docStu']); ?>" target="_blank" class="view-link">📄 View Doc</a>
                                     <?php endif; ?>
                                 </td>
                                 
                                 <!-- AUDIO COLUMN -->
                                 <td>
                                     <?php if(!empty($row['audioStu'])): ?>
-                                        <a href="<?php echo htmlspecialchars($row['audioStu']); ?>" target="_blank" class="view-link">🔊 Play Audio</a>
+                                        <a href="<?php echo htmlspecialchars($utemBaseUrl . $row['audioStu']); ?>" target="_blank" class="view-link">🔊 Play Audio</a>
                                         <form action="analyze_mmdb.php" method="POST" class="analyze-form">
                                             <input type="hidden" name="file_path" value="<?php echo htmlspecialchars($row['audioStu']); ?>">
                                             <input type="hidden" name="title" value="Audio: <?php echo htmlspecialchars($row['matric_no']); ?> - <?php echo htmlspecialchars($row['full_name']); ?>">
-                                            <button type="submit" class="btn-ai">✨ Analyze</button>
+                                            <button type="submit" class="btn-ai">✨ Analyze via AI</button>
                                         </form>
                                     <?php else: ?>
                                         <span style="color: #ccc;">No File</span>
@@ -299,11 +303,11 @@ try {
                                 <!-- VIDEO COLUMN -->
                                 <td>
                                     <?php if(!empty($row['videoStu'])): ?>
-                                        <a href="<?php echo htmlspecialchars($row['videoStu']); ?>" target="_blank" class="view-link">🎬 Play Video</a>
+                                        <a href="<?php echo htmlspecialchars($utemBaseUrl . $row['videoStu']); ?>" target="_blank" class="view-link">🎬 Play Video</a>
                                         <form action="analyze_mmdb.php" method="POST" class="analyze-form">
                                             <input type="hidden" name="file_path" value="<?php echo htmlspecialchars($row['videoStu']); ?>">
                                             <input type="hidden" name="title" value="Video: <?php echo htmlspecialchars($row['matric_no']); ?> - <?php echo htmlspecialchars($row['full_name']); ?>">
-                                            <button type="submit" class="btn-ai">✨ Analyze</button>
+                                            <button type="submit" class="btn-ai">✨ Analyze via AI</button>
                                         </form>
                                     <?php else: ?>
                                         <span style="color: #ccc;">No File</span>

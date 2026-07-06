@@ -13,12 +13,16 @@ if (!isset($_SESSION['user_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
     
     $userId = $_SESSION['user_id']; 
-    $relativePath = $_POST['file_path']; // e.g., "uploads/1779151815_AUDIO..."
+    $relativePath = $_POST['file_path']; // e.g., "uploads/1779151315_Slowly But Surely.mp3"
     $title = $_POST['title'];
 
-    // 1. Construct the remote URL and the local destination
-    $remoteUrl = "https://bitp3353.utem.edu.my/2026/all/" . $relativePath;
-    $localDest = $relativePath; // Keeps the exact "uploads/..." structure
+    // 1. Construct the URL safely by encoding spaces and special characters
+    // This breaks the path apart, encodes the filename, and puts it back together
+    $encodedPath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
+    $remoteUrl = "https://bitp3353.utem.edu.my/2026/all/" . $encodedPath;
+    
+    // The local destination stays exactly the same so it matches the database
+    $localDest = $relativePath; 
 
     // Ensure the local uploads directory exists
     $uploadDir = 'uploads/';
@@ -40,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
 
     if ($httpCode != 200 || !file_exists($localDest) || filesize($localDest) == 0) {
         if(file_exists($localDest)) unlink($localDest);
-        die("<h3 style='color:red;'>Error: Could not retrieve the remote file from: " . htmlspecialchars($remoteUrl) . "</h3>");
+        die("<h3 style='color:red;'>Error: Could not retrieve the remote file from: " . htmlspecialchars($remoteUrl) . " (HTTP Code: $httpCode)</h3>");
     }
 
     // 3. Local Extraction using the newly downloaded file
@@ -165,7 +169,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['file_path'])) {
     $stmt1 = null; $stmt2 = null; $stmt3 = null;
 
     try {
-        // Save the exact "uploads/..." path to the database
         $stmt1 = $conn->prepare("INSERT INTO MEDIA_ASSETS (User_ID, Title, File_Path, Format_Type, File_Size_MB) VALUES (?, ?, ?, ?, ?)");
         $stmt1->bind_param("isssd", $userId, $title, $localDest, $formatType, $fileSizeMB);
         $stmt1->execute();
